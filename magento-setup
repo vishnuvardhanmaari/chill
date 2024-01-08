@@ -1,0 +1,1232 @@
+#!/bin/bash
+
+#Docker installation
+echo "Checking the docker installtion"
+REQUIRED_PKG=$(docker -v)
+PKG=$(docker-compose -v)
+#For checking the docker installed or not
+if [ ${REQUIRED_PKG: -5} != "found" ]; then
+  echo "docker is intalled"
+else
+    echo "docker is not installed installing docker"
+    sudo apt-get update
+    sudo apt-get install \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    mkdir -p ~/.docker/cli-plugins/
+    curl -SL https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+    chmod +x ~/.docker/cli-plugins/docker-compose
+    sudo chown $USER:$USER /var/run/docker.sock
+    sudo apt-get update
+    sudo apt-get install docker-ce docker-ce-cli containerd.io -y
+fi
+
+#For checking the docker-compose installed or not
+if [ ${PKG: -5} != "found" ]; then
+  echo "docker-compose is intalled"
+else
+    echo "docker is not installed installing docker-compose"
+    sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+fi
+
+
+
+#stopping all services 
+sudo /etc/init.d/nginx stop 
+sudo /etc/init.d/rabbitmq-server stop  
+sudo /etc/init.d/elasticsearch stop 
+sudo /etc/init.d/mysql stop 
+sudo /etc/init.d/varnish stop 
+sudo /etc/init.d/redis-server stop 
+sudo /etc/init.d/apache2 stop 
+sudo  docker stop $(sudo docker ps -q)
+
+
+
+
+#starting docker setup
+PS3='Please enter your choice: '
+echo "========================================"
+echo " Please select the project type "
+echo "========================================="
+options=("default-magento2.3.7" "default-magento2.4" "default-magento2.4.1"  "default-magento2.4.2" "default-magento2.4.3" "default-magento2.4.3-p2"    "default-magento2.4.3-p3"  "default-magento2.4.4" "default-magento2.4.4-p1"    "default-magento2.4.4-p2"   "default-magento2.4.5"  "default-magento2.4.5-p1"   "Quit")
+
+
+path=
+select opt in "${options[@]}"
+do
+    case $opt in
+
+  "default-magento2.3.7")
+ProjectName=magento237
+
+#folderchecking for coping respective dockerfile on desktop
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo " ${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app  git clone -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento237.git .
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install 
+        
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento23
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;    
+
+
+ "default-magento2.4")
+
+ProjectName=magento240
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MYSQL_VERSION=5.7/MYSQL_VERSION=8.0/1" .env 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento240.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;     
+
+
+"default-magento2.4.1")
+
+ProjectName=magento241
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MYSQL_VERSION=5.7/MYSQL_VERSION=8.0/1" .env 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento241.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;     
+
+
+   
+
+"default-magento2.4.2")
+
+ProjectName=magento242
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MYSQL_VERSION=5.7/MYSQL_VERSION=8.0/1" .env 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento242.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;    
+
+
+
+"default-magento2.4.3")
+
+ProjectName=magento243
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MYSQL_VERSION=5.7/MYSQL_VERSION=8.0/1" .env 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento243.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;    
+
+
+"default-magento2.4.3-p2")
+
+ProjectName=magento243-p2
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MYSQL_VERSION=5.7/MYSQL_VERSION=8.0/1" .env 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento243p2.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;     
+
+
+"default-magento2.4.3-p3")
+
+ProjectName=magento243-p3
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento24-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MYSQL_VERSION=5.7/MYSQL_VERSION=8.0/1" .env 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento243p3.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;     
+
+"default-magento2.4.4")
+
+ProjectName=magento244
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento244.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer self-update --2
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;   
+
+"default-magento2.4.4-p1")
+
+ProjectName=magento244-p1
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento244p1.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer self-update --2
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;     
+
+
+"default-magento2.4.4-p2")
+
+ProjectName=magento244-p2
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento244p2.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer self-update --2
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;  
+
+  
+     "default-magento2.4.5")
+
+ProjectName=magento245
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone  https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo "${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+
+
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer self-update --2
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;     
+
+        "default-magento2.4.5-p1")
+
+ProjectName=magento245-p1
+
+#folderchecking for coping respective dockerfile on desktop 
+folderchecking(){
+            if [ ! -d ~/Desktop/${ProjectName} ]
+			then
+			echo "directory doesn't exist. creating now"
+			cd ~/Desktop/ && git clone https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245-docker-compose.git  ${ProjectName}
+            cd ~/Desktop/${ProjectName} && sudo mkdir src
+            sudo chmod -R 777 ~/Desktop/${ProjectName}
+            echo "directory created "
+			else 
+			echo " ${ProjectName} directory exists in Desktop please give diffrent name"
+            read -p "Projectname: " ProjectName
+            folderchecking
+			fi
+            MagentoType=${opt}
+}
+
+folderchecking
+
+#Dockerfile modification
+cd ~/Desktop/${ProjectName}/deploy && sudo sed -i "s/devops.local/${ProjectName}.local/1"  nginx.conf
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops/${ProjectName}/1"  docker-compose.dev.yml
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName} && sudo sed -i "s/devops.local/${ProjectName}.local/1"  .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_USER=dev/MAGENTO_USER=codilar/1" .application
+cd ~/Desktop/${ProjectName}/ && sudo sed -i "s/MAGENTO_PASSWORD=admin123/MAGENTO_PASSWORD=codilar123/1" .application 
+
+
+#Docker container creating, magento download and composer install
+cd  ~/Desktop/${ProjectName} && sudo docker-compose -f docker-compose.dev.yml up -d --build
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app git clone  -b mage-vendor https://sdali:ATBBt46vFYQFzqLGVBerjYKhUF869B8D48A4@bitbucket.org/codilar/magento245p1.git .
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer self-update --2
+cd  ~/Desktop/${ProjectName} && sudo docker-compose exec app composer install
+
+
+#adding url to /etc/hosts
+sudo sed -i "2 a 127.0.0.1     ${ProjectName}.local"  /etc/hosts 
+
+#creating env and runnning magento commands
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento setup:install --base-url=http://${ProjectName}.local/ --db-host=mysql  --db-name=magento --db-user=root --db-password=codilar --admin-firstname=admin --admin-lastname=demo --admin-email=codilar@codilar.com --admin-user=codilar --admin-password=codilar123 --backend-frontname=admin --language=en_US --currency=INR --timezone=Asia/Kolkata --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host=elasticsearch --elasticsearch-port=9200
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app php bin/magento module:disable Magento_TwoFactorAuth
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:up 
+cd ~/Desktop/${ProjectName}  && sudo docker-compose exec app bin/magento se:st:de -f  
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento se:di:com 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento ind:reind 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app bin/magento c:c 
+cd ~/Desktop/${ProjectName} && sudo docker-compose exec app chmod -R 777 var/ pub/ generated/
+# docker and directory permission
+sudo chown -R $USER:$USER ~/Desktop/${ProjectName} 
+sudo chown -R $USER:$USER /var/run/docker.sock
+
+
+#Printing all details related to setup
+display(){
+cat <<EOF
+########################################
+
+The project name is: default-magento24
+______________________________________________
+
+The project Url is: ${ProjectName}.local
+______________________________________________
+
+The project path: /home/$USER/Desktop/${ProjectName}
+______________________________________________
+
+The admin username  is: codilar
+_______________________________________________
+
+The admin password   is: codilar123
+_______________________________________________
+
+Mysql username is: root
+_______________________________________________
+
+Mysql password is: codilar
+_______________________________________________
+
+Mysql database is: magento
+_______________________________________________
+
+EOF
+}
+display
+display > /home/$USER/Desktop/${ProjectName}/${ProjectName}_credentails.txt
+google-chrome-stable --no-sandbox --user-data-dir --incognito http://$ProjectName.local  http://$ProjectName.local/admin http://$ProjectName.local/adminer 
+			 break
+            ;;
+
+          "Quit")
+            break
+            ;;
+        *) echo "invalid option $REPLY";;
+    esac
+done
+
+#Easy deploy commands script 
+cat ~/Desktop/${ProjectName}/easy-deployment-commands 
+
+vignesh(){
+echo -e "\033[37;1m Developed By \033[0m"
+echo -e "\033[31;1m   
+      .__                            .__      
+___  _|__| ____   ____   ____   _____|  |__   
+\  \/ /  |/ ___\ /    \_/ __ \ /  ___/  |  \  
+ \   /|  / /_/  >   |  \  ___/ \___ \|   Y  \ 
+  \_/ |__\___  /|___|  /\___  >____  >___|  / 
+        /_____/      \/     \/     \/     \/ 
+\033[0m"  "\033[33;1m 
+DevOps Engineer
+vignesh.k@codilar.com
+Codilar Technologies 
+\033[0m"
+}
+
+ali(){
+echo -e "\033[37;1m Developed & Guided By \033[0m"
+echo -e "\033[31;1m   
+ _______  _       _________
+(  ___  )( \      \__   __/
+| (   ) || (         ) (   
+| (___) || |         | |   
+|  ___  || |         | |   
+| (   ) || |         | |   
+| )   ( || (____/\___) (___
+|/     \|(_______/\_______/
+\033[0m"  "\033[33;1m                           
+Team Lead (DevOps)
+ali@codilar.com
+Codilar Technologies 
+\033[0m"
+}
+vignesh
+ali
