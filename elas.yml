@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Path to the Elasticsearch jvm.options file
+jvm_options_file="/etc/elasticsearch/jvm.options"
+
+# Delete existing lines containing -Xms and add new line with -Xms1g at the beginning of the line
+sed -i '/-Xms/c\-Xms1g' "$jvm_options_file"
+
+# Delete existing lines containing -Xmx and add new line with -Xmx1g at the beginning of the line
+sed -i '/-Xmx/c\-Xmx1g' "$jvm_options_file"
+
+echo "Elasticsearch heap settings updated to 2g."
+
+sudo service elasticsearch restart
