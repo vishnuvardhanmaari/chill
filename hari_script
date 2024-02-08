@@ -1,0 +1,307 @@
+#!/bin/bash
+choice () {
+    local choice=$1
+    if [[ ${opts[choice]} ]] 
+    then
+        opts[choice]=
+    else
+        opts[choice]=+
+    fi
+}
+PS3='Please enter your choices: '
+while :
+do
+clear
+echo "========================================"
+echo " Please Select The Dependencies  Needed "
+echo "========================================="
+options=("Phpstorm ${opts[1]}" "docker ${opts[2]}" "php7.3 ${opts[3]}" "php7.4 ${opts[4]}" "nginx ${opts[5]}" "apache ${opts[6]}" "mysql ${opts[7]}" "mariadb ${opts[8]}" "elasticsearch6 ${opts[9]}" "elasticsearch7 ${opts[10]}" "anydesk ${opts[11]}" "teamviewer ${opts[12]}" "php8.1 ${opts[13]}" "redis ${opts[14]}" "phpmyadmin ${opts[15]}" "Done") 
+   select opt in "${options[@]}"
+    
+    do
+  
+        case $opt in 
+             "Phpstorm ${opts[1]}")
+                choice 1 
+               function number1
+               {
+                echo -n "Installing phpstorm ......."|pv -qL 10 
+                sudo snap install phpstorm --classic  
+                echo "Done."|pv -qL 10 
+                
+                }
+             
+                break                
+                ;;
+            "docker ${opts[2]}")
+                choice 2
+               function number2
+               {
+                 echo -n "installing Docker ......."|pv -qL 10 
+                   sudo apt-get update > /dev/null;
+    sudo apt-get install \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release -y  > /dev/null;
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null;
+    echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    mkdir -p ~/.docker/cli-plugins/ 
+    curl -SL https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose  > /dev/null;
+    chmod +x ~/.docker/cli-plugins/docker-compose  > /dev/null;
+    sudo chown $USER /var/run/docker.sock  > /dev/null;
+    sudo apt-get update  > /dev/null;
+    sudo apt-get install docker-ce docker-ce-cli containerd.io -y  > /dev/null;
+    sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose  > /dev/null;
+    sudo chmod +x /usr/local/bin/docker-compose  > /dev/null;
+    echo "Done."|pv -qL 10 
+
+
+               }
+                break
+                ;;
+            "php7.3 ${opts[3]}")
+                choice 3
+                function number3
+                {
+                    echo -n "Installing PHP7.3 ......."|pv -qL 10 
+                    apt-get update > /dev/null;
+sudo apt-get install software-properties-common -y > /dev/null;
+sudo yes '' |add-apt-repository ppa:ondrej/php  > /dev/null;
+sudo apt-get install -y php7.3 libapache2-mod-php7.3 php7.3-common php7.3-gd php7.3-mysql php7.3-curl php7.3-intl php7.3-xsl php7.3-mbstring php7.3-zip php7.3-bcmath php7.3-iconv php7.3-soap php7.3-fpm > /dev/null;
+   echo "Done."|pv -qL 10 
+
+            }
+
+                break
+                ;;
+            "php7.4 ${opts[4]}")
+                choice 4
+                function number4
+                {
+                    echo -n "Installing PHP7.4 ......."|pv -qL 10 
+                     apt-get update   > /dev/null;
+sudo apt-get install software-properties-common -y  > /dev/null;
+yes '' |sudo add-apt-repository ppa:ondrej/php  > /dev/null;
+sudo apt-get install -y php7.4 libapache2-mod-php7.4 php7.4-common php7.4-gd php7.4-mysql php7.4-curl php7.4-intl php7.4-xsl php7.4-mbstring php7.4-zip php7.4-bcmath php7.4-iconv php7.4-soap php7.4-fpm  > /dev/null;
+  echo "Done."|pv -qL 10 
+
+                }
+                break
+                ;;
+            "nginx ${opts[5]}")
+                choice 5
+               function number5
+               { 
+                   echo -n "Installing Nginx ......."|pv -qL 10 
+                    sudo apt install nginx -y > /dev/null; 
+                    echo "Done."|pv -qL 10 
+               }
+                break
+                ;;
+            "apache ${opts[6]}")
+                
+                choice 6
+function number6
+{
+ echo -n "Installing Apache ......."|pv -qL 10 
+ sudo apt install apache2 -y  > /dev/null; 
+ echo "Done."|pv -qL 10 
+               }
+
+
+
+                break
+                ;;
+            "mysql ${opts[7]}")
+                choice 7
+                function number7
+                {
+                    sudo apt update > /dev/null
+                        wget https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb 
+                        sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb 
+                        sudo apt update 
+                        sudo apt install mysql-client mysql-community-server mysql-server -y
+                        mysql -u root -p -e "CREATE DATABASE magento;"
+
+                }
+                break
+                ;;
+            "mariadb ${opts[8]}")
+                choice 8
+                function number8
+                {
+                   echo -n "Installing Mariadb ......."|pv -qL 10 
+                   sudo apt-get install software-properties-common  > /dev/null;
+sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 0xF1656F24C74CD1D8  > /dev/null;
+sudo add-apt-repository "deb [arch=amd64,arm64,ppc64el] http://mariadb.mirror.liquidtelecom.com/repo/10.4/ubuntu $(lsb_release -cs) main"  > /dev/null;
+sudo apt update  > /dev/null;
+sudo apt -y install mariadb-server mariadb-client  > /dev/null;
+sudo mysql_secure_installation
+                }
+                break
+                ;;
+            "elasticsearch6 ${opts[9]}")
+                choice 9
+                 function number9
+                 {
+                     echo -n "Installing Elasticsearch6......."|pv -qL 10 
+                     sudo apt-get install default-jdk -y  > /dev/null;
+   wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add - > /dev/null;
+   sudo apt-get install apt-transport-https > /dev/null;
+   echo "deb https://artifacts.elastic.co/packages/6.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-6.x.list > /dev/null;
+   sudo apt-get update > /dev/null; 
+    sudo apt-get install elasticsearch  > /dev/null;
+  sudo /etc/init.d/elasticsearch status  > /dev/null;
+sudo /etc/init.d/elasticsearch start  > /dev/null;
+echo "Done."|pv -qL 10 
+
+                 }
+                break
+                ;;
+            "elasticsearch7 ${opts[10]}")
+                choice 10
+                 function number10
+                 {
+                     echo -n "Installing Elasticsearch7......."|pv -qL 10 
+                     sudo apt-get install default-jdk -y > /dev/null;
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add - > /dev/null;
+sudo apt-get install apt-transport-https > /dev/null;
+echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-7.x.list > /dev/null;
+sudo apt-get update > /dev/null;  
+sudo apt-get install elasticsearch > /dev/null;
+sudo /etc/init.d/elasticsearch status > /dev/null;
+sudo /etc/init.d/elasticsearch start > /dev/null;
+echo "Done."|pv -qL 10 
+                 }
+                break
+                ;;
+             "anydesk ${opts[11]}")
+                choice 11
+               function number11
+               { 
+                   echo -n "Installing Anydesk ......."|pv -qL 10 
+                    sudo apt update > /dev/null;
+                    sudo apt install wget > /dev/null; 
+                    sudo wget -qO - https://keys.anydesk.com/repos/DEB-GPG-KEY | sudo apt-key add - > /dev/null;  
+                    echo "deb http://deb.anydesk.com/ all main" | sudo tee /etc/apt/sources.list.d/anydesk-stable.list > /dev/null;
+                    sudo apt update > /dev/null;
+                    sudo apt install anydesk -y > /dev/null;
+                    echo "Done."|pv -qL 10 
+
+               }
+                break
+                ;;
+                   "teamviewer ${opts[12]}")
+                choice 12
+               function number12
+               { 
+                   echo -n "Installing Teamviewer ......."|pv -qL 10 
+                    sudo apt update > /dev/null;
+                    sudo apt install wget > /dev/null; 
+                    wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb  > /dev/null;
+                    sudo apt install ./teamviewer_amd64.deb > /dev/null;  
+                    echo "Done."|pv -qL 10 
+
+               }
+                break
+                ;;
+                "php8.1 ${opts[13]}")
+                choice 13
+                function number13
+                {
+                    echo -n "Installing PHP8.1 ......."|pv -qL 10 
+                    apt-get update > /dev/null;
+sudo apt-get install software-properties-common -y > /dev/null;
+yes '' |sudo add-apt-repository ppa:ondrej/php  > /dev/null;
+sudo apt-get install -y php8.1 libapache2-mod-php8.1 php8.1-common php8.1-gd php8.1-mysql php8.1-curl php8.1-intl php8.1-xsl php8.1-mbstring php8.1-zip php8.1-bcmath php8.1-iconv php8.1-soap php8.1-fpm > /dev/null;
+   echo "Done."|pv -qL 10 
+
+            }
+
+                break
+                ;;
+                "redis ${opts[14]}")
+                choice 14
+               function number14
+               { 
+                   sudo apt update -y > /dev/null
+                   sudo apt install redis-server -y > /dev/null
+                   sudo systemctl start redis-server > /dev/null
+               }
+                break
+                ;;
+            
+             "phpmyadmin ${opts[15]}")
+                choice 15
+               function number15
+               { 
+
+sudo apt install phpmyadmin -y
+
+
+               }
+
+                break
+                ;;
+               
+            "Done")
+                break  16
+                ;;
+            *) printf '%s\n' 'invalid option';;
+            esac
+    done
+done
+
+number1 grep -i  'command not found' 2>/dev/null 
+number2 grep -i  'command not found' 2>/dev/null 
+number3 grep -i  'command not found' 2>/dev/null
+number4 grep -i  'command not found' 2>/dev/null
+number5  grep -i  'command not found' 2>/dev/null
+number6  grep -i  'command not found' 2>/dev/null
+number7  grep -i  'command not found' 2>/dev/null
+number8  grep -i  'command not found' 2>/dev/null
+number9  grep -i  'command not found' 2>/dev/null
+number10  grep -i  'command not found' 2>/dev/null
+number11  grep -i  'command not found' 2>/dev/null
+number12  grep -i  'command not found' 2>/dev/null
+number13  grep -i  'command not found' 2>/dev/null
+number14  grep -i  'command not found' 2>/dev/null
+number15  grep -i  'command not found' 2>/dev/null
+
+
+printf '%s\n' 'Options chosen:'
+for opt in "${!opts[@]}"
+do
+    if [[ ${opts[opt]} ]]
+    then
+        printf '%s\n' "Option $opt"
+    fi
+            
+done
+
+{
+echo "======================================================="
+echo -e "\033[37;1m Developed By \033[0m"
+echo -e "\033[31;1m   
+
+   ▄█    █▄       ▄████████    ▄████████  ▄█     ▄████████    ▄█    █▄    
+  ███    ███     ███    ███   ███    ███ ███    ███    ███   ███    ███   
+  ███    ███     ███    ███   ███    ███ ███▌   ███    █▀    ███    ███   
+ ▄███▄▄▄▄███▄▄   ███    ███  ▄███▄▄▄▄██▀ ███▌   ███         ▄███▄▄▄▄███▄▄ 
+▀▀███▀▀▀▀███▀  ▀███████████ ▀▀███▀▀▀▀▀   ███▌ ▀███████████ ▀▀███▀▀▀▀███▀  
+  ███    ███     ███    ███ ▀███████████ ███           ███   ███    ███   
+  ███    ███     ███    ███   ███    ███ ███     ▄█    ███   ███    ███   
+  ███    █▀      ███    █▀    ███    ███ █▀    ▄████████▀    ███    █▀    
+                              ███    ███                                  
+
+\033[0m"  "\033[33;1m                                                      
+DevOps Engineer
+harish.k@codilar.com
+Codilar Technologies 
+\033[0m"
+echo "======================================================"
+}
+
